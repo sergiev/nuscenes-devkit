@@ -319,3 +319,22 @@ def DeserializeMetric(config: Dict[str, Any]) -> Metric:
                            tolerance=config['tolerance'])
     else:
         raise ValueError(f"Cannot deserialize function {config['name']}.")
+
+
+def flatten_metrics(results: Dict[str, Any], metrics: List[Metric]):
+
+    metric_names = {metric.name: metric for metric in metrics}
+
+    flattened_metrics = {}
+
+    for metric_name, values in results.items():
+
+        metric_class = metric_names[metric_name]
+
+        if hasattr(metric_class, 'k_to_report'):
+            for value, k in zip(values['RowMean'], metric_class.k_to_report):
+                flattened_metrics[f"{metric_name}_{k}"] = value
+        else:
+            flattened_metrics[metric_name] = values['RowMean']
+
+    return flattened_metrics

@@ -231,4 +231,22 @@ class TestMetrics(unittest.TestCase):
         self.assertListEqual(m.k_to_report, [1, 5, 10])
         self.assertEqual(m.aggregators[0].name, 'RowMean')
 
+    def test_flatten_metrics(self):
+
+        results = {"MinFDEK": {"RowMean": [5.92, 6.1, 7.2]},
+                   "MinADEK": {"RowMean": [2.48, 3.29, 3.79]},
+                   "HitRateTopK_2": {"RowMean": [0.37, 0.45, 0.55]}}
+
+        metric_functions = [metrics.MinFDEK([1, 5, 10], aggregators=[metrics.RowMean()]),
+                            metrics.MinADEK([1, 5, 10], aggregators=[metrics.RowMean()]),
+                            metrics.HitRateTopK([1, 5, 10], tolerance=2, aggregators=[metrics.RowMean()])]
+
+        flattened = metrics.flatten_metrics(results, metric_functions)
+
+        answer = {'MinFDEK_1': 5.92, 'MinFDEK_5': 6.1, 'MinFDEK_10': 7.2,
+                  'MinADEK_1': 2.48, 'MinADEK_5': 3.29, 'MinADEK_10': 3.79,
+                  'HitRateTopK_2_1': 0.37, 'HitRateTopK_2_5': 0.45, 'HitRateTopK_2_10': 0.55}
+
+        self.assertDictEqual(flattened, answer)
+
 

@@ -24,7 +24,6 @@ def compute_metrics(predictions: List[Dict[str, Any]],
     :param helper: Instance of PredictHelper that wraps the nuScenes test set.
     :param config: Config file.
     """
-    # TODO: Add check that n_preds is same size as test set once that is finalized
     n_preds = len(predictions)
 
     containers = {metric.name: np.zeros((n_preds, metric.shape)) for metric in config.metrics}
@@ -33,7 +32,7 @@ def compute_metrics(predictions: List[Dict[str, Any]],
 
         prediction = Prediction.deserialize(prediction_str)
         ground_truth = helper.get_future_for_agent(prediction.instance, prediction.sample,
-                                                   config.seconds, in_agent_frame=True)
+                                                   config.seconds, in_agent_frame=False)
 
         for metric in config.metrics:
             containers[metric.name][i] = metric(ground_truth, prediction)
