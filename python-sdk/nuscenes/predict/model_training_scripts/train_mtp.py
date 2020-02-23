@@ -61,8 +61,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Train MTP.')
     parser.add_argument('--num_epochs', type=int, help='Number of Epochs to train for')
-    parser.add_argument('--nuscenes_version', default='v1.0-mini')
-    parser.add_argument('--split_name', default='mini')
+    parser.add_argument('--nuscenes_version', default='v1.0')
+    parser.add_argument('--split_name', default='')
     parser.add_argument('--loss_file_name', help='File to store the loss after every epoch.')
     parser.add_argument('--num_modes', type=int, help='How many modes to learn.', default=1)
     parser.add_argument('--use_gpu', type=bool, help='Whether to use gpu', default=False)
@@ -77,12 +77,15 @@ if __name__ == "__main__":
     helper = PredictHelper(nusc)
 
     if args.split_name == 'mini':
-        prefix = 'mini'
+        prefix = 'mini_'
     else:
         prefix = ''
 
-    train_tokens = get_prediction_challenge_split(prefix + '_train')
-    val_tokens = get_prediction_challenge_split(prefix + '_val')
+    def filter_tokens(tokens, helper: PredictHelper):
+        return [tok for tok in tokens if 'vehicle' in helper.get_sample_annotation(*tok.split("_"))['category_name']]
+
+    train_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'train'))
+    val_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'val'))
 
     static_layer_rasterizer = StaticLayerRasterizer(helper)
     agent_rasterizer = AgentBoxesWithFadedHistory(helper)
