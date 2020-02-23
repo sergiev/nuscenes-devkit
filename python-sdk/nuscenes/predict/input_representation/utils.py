@@ -2,8 +2,8 @@
 # Code written by Freddy Boulton, 2020.
 
 from typing import Tuple
-import cv2
 import numpy as np
+import cv2
 
 from nuscenes.predict.helper import angle_of_rotation
 
