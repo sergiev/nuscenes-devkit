@@ -12,6 +12,7 @@ import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
+from torch import nn
 
 from nuscenes import NuScenes
 from nuscenes.predict import PredictHelper
@@ -53,7 +54,7 @@ class MTPDataset(Dataset):
 
         ground_truth = self.helper.get_future_for_agent(instance_token, sample_token, seconds=6, in_agent_frame=True)
 
-        return img, agent_state_vector, ground_truth
+        return img, agent_state_vector, torch.FloatTensor(np.expand_dims(ground_truth, 0))
 
 
 
@@ -61,7 +62,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Train MTP.')
     parser.add_argument('--num_epochs', type=int, help='Number of Epochs to train for')
-    parser.add_argument('--nuscenes_version', default='v1.0')
+    parser.add_argument('--nuscenes_version', default='v1.0-trainval')
     parser.add_argument('--split_name', default='')
     parser.add_argument('--loss_file_name', help='File to store the loss after every epoch.')
     parser.add_argument('--num_modes', type=int, help='How many modes to learn.', default=1)
@@ -82,10 +83,11 @@ if __name__ == "__main__":
         prefix = ''
 
     def filter_tokens(tokens, helper: PredictHelper):
-        return [tok for tok in tokens if 'vehicle' in helper.get_sample_annotation(*tok.split("_"))['category_name']]
+        return [tok for tok in tokens if 'vehicle' in helper.get_sample_annotation(*tok.split("_"))['category_name']][:48]
+    
 
-    train_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'train'))
-    val_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'val'))
+    train_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'train'), helper)
+    val_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'val'), helper)
 
     static_layer_rasterizer = StaticLayerRasterizer(helper)
     agent_rasterizer = AgentBoxesWithFadedHistory(helper)
@@ -97,7 +99,7 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(val_dataset, batch_size=16, num_workers=16)
 
     backbone = ResNetBackbone('resnet50')
-    model = MTP(backbone, args.num_modes)
+    model = nn.DataParallel(MTP(backbone, args.num_modes))
     model = model.to(device)
 
     loss_function = MTPLoss(args.num_modes, 1, 5)
@@ -123,6 +125,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             prediction = model(img, agent_state_vector)
+            import pdb; pdb.set_trace()
             loss = loss_function(prediction, ground_truth)
             loss.backward()
             optimizer.step()
