@@ -16,13 +16,12 @@ class CoverNet(nn.Module):
     https://arxiv.org/pdf/1911.10298.pdf
     """
 
-    def __init__(self, backbone: nn.Module, num_modes: int,
+    def __init__(self, backbone: nn.Module,
                  n_hidden_layers: List[int] = None,
                  input_shape: Tuple[int, int, int] = (3, 500, 500)):
         """
         Inits Covernet.
         :param backbone: Backbone model. Typically ResNetBackBone or MobileNetBackbone
-        :param num_modes: Number of modes in the lattice
         :param n_hidden_layers: List of dimensions in the fully connected layers after the backbones.
             If None, set to [4096]
         :param input_shape: Shape of image input. Used to determine the dimensionality of the feature
