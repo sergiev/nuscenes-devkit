@@ -62,6 +62,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train MTP.')
     parser.add_argument('--num_epochs', type=int, help='Number of Epochs to train for')
     parser.add_argument('--nuscenes_version', default='v1.0-trainval')
+    parser.add_argument('--nuscenes_dataroot')
     parser.add_argument('--split_name', default='', choices=['mini', ''])
     parser.add_argument('--loss_file_name', help='File to store the loss after every epoch.')
     parser.add_argument('--lattice_pickle_file', help='Pickle file storing the lattice.')
@@ -71,7 +72,7 @@ if __name__ == "__main__":
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    nusc = NuScenes(args.nuscenes_version)
+    nusc = NuScenes(args.nuscenes_version, dataroot=args.nuscenes_dataroot)
     helper = PredictHelper(nusc)
 
     if args.split_name == 'mini':
