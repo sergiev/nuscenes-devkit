@@ -6,6 +6,7 @@ Regression test to see if MTP can overfit on a single example.
 """
 
 import argparse
+import os
 from typing import List
 import json
 import numpy as np
@@ -69,7 +70,13 @@ if __name__ == "__main__":
     parser.add_argument('--num_modes', type=int, help='How many modes to learn.', default=1)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--num_workers', type=int, default=16)
+    parser.add_argument("--output_dir")
     args = parser.parse_args()
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    loss_file_name = os.path.join(args.output_dir, args.loss_file_name)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -106,7 +113,7 @@ if __name__ == "__main__":
     losses = {'train': [],
               'val': []}
 
-    json.dump(losses, open(args.loss_file_name, "w"))
+    json.dump(losses, open(loss_file_name, "w"))
 
     optimizer = optim.SGD(model.parameters(), lr=0.001)
 
@@ -136,11 +143,11 @@ if __name__ == "__main__":
 
         epoch_train_loss = train_loss / (index + 1)
 
-        losses = json.load(open(args.loss_file_name))
+        losses = json.load(open(loss_file_name))
         losses['train'].append(epoch_train_loss)
-        json.dump(losses, open(args.loss_file_name, "w"))
+        json.dump(losses, open(loss_file_name, "w"))
 
-        torch.save(model.state_dict(), f'./epoch{epoch_number}.pth')
+        torch.save(model.state_dict(), os.path.join(args.output_dir, f'./epoch{epoch_number}.pth'))
 
         with torch.no_grad():
             for index, data in enumerate(val_dataloader):
@@ -159,9 +166,9 @@ if __name__ == "__main__":
 
         epoch_val_loss = val_loss / (index + 1)
 
-        losses = json.load(open(args.loss_file_name))
+        losses = json.load(open(loss_file_name))
         losses['val'].append(epoch_val_loss)
-        json.dump(losses, open(args.loss_file_name, "w"))
+        json.dump(losses, open(loss_file_name, "w"))
 
 
 
