@@ -149,7 +149,7 @@ def default_colors(category_name: str) -> Tuple[int, int, int]:
     elif 'human' in category_name:
         return (255, 153, 51) # orange
     else:
-        raise ValueError(f"Cannot map {category_name} to a color.")
+        return (204, 0, 204)
 
 
 def draw_agent_boxes(center_agent_annotation: Dict[str, Any],

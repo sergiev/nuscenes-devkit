@@ -48,9 +48,11 @@ class MTPDataset(Dataset):
         img = self.input_representation.make_input_representation(instance_token, sample_token)
         img = torch.Tensor(img).permute(2, 0, 1)
 
-        agent_state_vector = torch.Tensor([self.helper.get_velocity_for_agent(instance_token, sample_token),
+        agent_state_vector = np.array([self.helper.get_velocity_for_agent(instance_token, sample_token),
                                            self.helper.get_acceleration_for_agent(instance_token, sample_token),
                                            self.helper.get_heading_change_rate_for_agent(instance_token, sample_token)])
+        agent_state_vector = np.nan_to_num(agent_state_vector, -10.0)
+        agent_state_vector = torch.Tensor(agent_state_vector)
 
         ground_truth = self.helper.get_future_for_agent(instance_token, sample_token, seconds=6, in_agent_frame=True)
 
@@ -83,7 +85,7 @@ if __name__ == "__main__":
         prefix = ''
 
     def filter_tokens(tokens, helper: PredictHelper):
-        return [tok for tok in tokens if 'vehicle' in helper.get_sample_annotation(*tok.split("_"))['category_name']][:48]
+        return [tok for tok in tokens if 'vehicle' in helper.get_sample_annotation(*tok.split("_"))['category_name']]
     
 
     train_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'train'), helper)
@@ -125,7 +127,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             prediction = model(img, agent_state_vector)
-            import pdb; pdb.set_trace()
+            
             loss = loss_function(prediction, ground_truth)
             loss.backward()
             optimizer.step()
@@ -135,7 +137,7 @@ if __name__ == "__main__":
             print(f"Current train loss at epoch {epoch_number} and iteration {index} is {current_loss:.4f}")
             train_loss += current_loss
 
-        epoch_train_loss = train_loss / index
+        epoch_train_loss = train_loss / (index + 1)
 
         losses = json.load(open(args.loss_file_name))
         losses['train'].append(epoch_train_loss)
@@ -158,7 +160,7 @@ if __name__ == "__main__":
                 print(f"Current val loss at epoch {epoch_number} and iteration {index} is {current_loss:.4f}")
                 val_loss += current_loss
 
-        epoch_val_loss = val_loss / index
+        epoch_val_loss = val_loss / (index + 1)
 
         losses = json.load(open(args.loss_file_name))
         losses['val'].append(epoch_val_loss)
