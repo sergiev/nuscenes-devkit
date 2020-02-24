@@ -6,6 +6,7 @@ Regression test to see if MTP can overfit on a single example.
 """
 
 import argparse
+import pickle
 from typing import List
 import json
 import numpy as np
@@ -22,17 +23,16 @@ from nuscenes.predict.input_representation.agents import AgentBoxesWithFadedHist
 from nuscenes.predict.input_representation.interface import InputRepresentation
 from nuscenes.predict.input_representation.combinators import Rasterizer
 from nuscenes.predict.models.backbone import ResNetBackbone
-from nuscenes.predict.models.mtp import MTP, MTPLoss
+from nuscenes.predict.models.covernet import CoverNet, ConstantLatticeLoss
 
 
-class MTPDataset(Dataset):
+class CoverNetDataset(Dataset):
     """
-    Implements a dataset for MTP.
+    Implements a dataset for CoverNet.
     """
 
     def __init__(self, tokens: List[str], helper: PredictHelper,
-                 input_representation: InputRepresentation,
-                 num_modes: int = 1):
+                 input_representation: InputRepresentation):
         self.tokens = tokens
         self.helper = helper
         self.input_representation = input_representation
@@ -41,15 +41,14 @@ class MTPDataset(Dataset):
         return len(self.tokens)
 
     def __getitem__(self, item: int):
-
         instance_token, sample_token = self.tokens[item].split("_")
 
         img = self.input_representation.make_input_representation(instance_token, sample_token)
         img = torch.Tensor(img).permute(2, 0, 1)
 
         agent_state_vector = np.array([self.helper.get_velocity_for_agent(instance_token, sample_token),
-                                           self.helper.get_acceleration_for_agent(instance_token, sample_token),
-                                           self.helper.get_heading_change_rate_for_agent(instance_token, sample_token)])
+                                       self.helper.get_acceleration_for_agent(instance_token, sample_token),
+                                       self.helper.get_heading_change_rate_for_agent(instance_token, sample_token)])
         agent_state_vector = np.nan_to_num(agent_state_vector, -10.0)
         agent_state_vector = torch.Tensor(agent_state_vector)
 
@@ -58,15 +57,14 @@ class MTPDataset(Dataset):
         return img, agent_state_vector, torch.FloatTensor(np.expand_dims(ground_truth, 0))
 
 
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Train MTP.')
     parser.add_argument('--num_epochs', type=int, help='Number of Epochs to train for')
     parser.add_argument('--nuscenes_version', default='v1.0-trainval')
-    parser.add_argument('--split_name', default='')
+    parser.add_argument('--split_name', default='', choices=['mini', ''])
     parser.add_argument('--loss_file_name', help='File to store the loss after every epoch.')
-    parser.add_argument('--num_modes', type=int, help='How many modes to learn.', default=1)
+    parser.add_argument('--lattice_pickle_file', help='Pickle file storing the lattice.')
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--num_workers', type=int, default=16)
     args = parser.parse_args()
@@ -83,25 +81,26 @@ if __name__ == "__main__":
 
     def filter_tokens(tokens, helper: PredictHelper):
         return [tok for tok in tokens if 'vehicle' in helper.get_sample_annotation(*tok.split("_"))['category_name']]
-    
 
     train_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'train'), helper)
     val_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'val'), helper)
 
     static_layer_rasterizer = StaticLayerRasterizer(helper)
     agent_rasterizer = AgentBoxesWithFadedHistory(helper)
-    mtp_input_representation = InputRepresentation(static_layer_rasterizer, agent_rasterizer, Rasterizer())
+    covernet_input_representation = InputRepresentation(static_layer_rasterizer, agent_rasterizer, Rasterizer())
 
-    train_dataset = MTPDataset(train_tokens, helper, mtp_input_representation)
-    val_dataset = MTPDataset(val_tokens, helper, mtp_input_representation)
+    train_dataset = CoverNetDataset(train_tokens, helper, covernet_input_representation)
+    val_dataset = CoverNetDataset(val_tokens, helper, covernet_input_representation)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=args.num_workers)
 
+    lattice = pickle.load(open(args.lattice_pickle_file, "rb"))
+
     backbone = ResNetBackbone('resnet50')
-    model = nn.DataParallel(MTP(backbone, args.num_modes))
+    model = nn.DataParallel(CoverNet(backbone, args.num_modes))
     model = model.to(device)
 
-    loss_function = MTPLoss(args.num_modes, 1, 5)
+    loss_function = ConstantLatticeLoss(lattice)
 
     losses = {'train': [],
               'val': []}
@@ -124,7 +123,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             prediction = model(img, agent_state_vector)
-            
+
             loss = loss_function(prediction, ground_truth)
             loss.backward()
             optimizer.step()
@@ -144,7 +143,6 @@ if __name__ == "__main__":
 
         with torch.no_grad():
             for index, data in enumerate(val_dataloader):
-
                 img, agent_state_vector, ground_truth = data
                 img = img.to(device)
                 agent_state_vector = agent_state_vector.to(device)
