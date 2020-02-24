@@ -105,7 +105,7 @@ if __name__ == "__main__":
     lattice = pickle.load(open(args.lattice_pickle_file, "rb"))
 
     backbone = ResNetBackbone('resnet50')
-    model = nn.DataParallel(CoverNet(backbone))
+    model = nn.DataParallel(CoverNet(backbone, lattice.shape[0]))
     model = model.to(device)
 
     loss_function = ConstantLatticeLoss(lattice)
