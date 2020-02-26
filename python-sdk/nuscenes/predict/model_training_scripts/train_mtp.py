@@ -81,8 +81,8 @@ if __name__ == "__main__":
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    nusc = NuScenes(args.nuscenes_version)
-    helper = PredictHelper(nusc, dataroot=args.nuscenes_dataroot)
+    nusc = NuScenes(args.nuscenes_version, dataroot=args.nuscenes_dataroot)
+    helper = PredictHelper(nusc)
 
     if args.split_name == 'mini':
         prefix = 'mini_'
@@ -92,7 +92,6 @@ if __name__ == "__main__":
     def filter_tokens(tokens, helper: PredictHelper):
         return [tok for tok in tokens if 'vehicle' in helper.get_sample_annotation(*tok.split("_"))['category_name']]
     
-
     train_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'train'), helper)
     val_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'val'), helper)
 
