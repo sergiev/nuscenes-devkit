@@ -15,6 +15,8 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torch import nn
+from torchvision.transforms import Normalize
+import cv2
 
 from nuscenes import NuScenes
 from nuscenes.predict import PredictHelper
@@ -26,6 +28,7 @@ from nuscenes.predict.input_representation.combinators import Rasterizer
 from nuscenes.predict.models.backbone import ResNetBackbone
 from nuscenes.predict.models.covernet import CoverNet, ConstantLatticeLoss
 
+IMAGE_CACHE = os.environ['IMAGE_CACHE']
 
 class CoverNetDataset(Dataset):
     """
@@ -37,19 +40,36 @@ class CoverNetDataset(Dataset):
         self.tokens = tokens
         self.helper = helper
         self.input_representation = input_representation
+        self.normalizer = Normalize([125, 125, 125], [255, 255, 255])
 
     def __len__(self):
         return len(self.tokens)
 
     def __getitem__(self, item: int):
-        instance_token, sample_token = self.tokens[item].split("_")
+        token = self.tokens[item]
+        instance_token, sample_token = token.split("_")
+
+        token_str = f"{instance_token}_{sample_token}"
+
+        img_name = os.path.join(IMAGE_CACHE, token_str + ".png")
+
+        if os.path.exists(img_name):
+            image = cv2.imread(img_name)
+        else:
+            image = self.input_representation.make_input_representation(instance_token, sample_token)
+            cv2.imwrite(img_name, image)
+
+        for image_transform in self.image_transformers:
+            image = image_transform(image)
 
         img = self.input_representation.make_input_representation(instance_token, sample_token)
         img = torch.Tensor(img).permute(2, 0, 1)
+        img = self.normalizer(img)
 
         agent_state_vector = np.array([self.helper.get_velocity_for_agent(instance_token, sample_token),
                                        self.helper.get_acceleration_for_agent(instance_token, sample_token),
                                        self.helper.get_heading_change_rate_for_agent(instance_token, sample_token)])
+
         agent_state_vector = np.nan_to_num(agent_state_vector, -10.0)
         agent_state_vector = torch.Tensor(agent_state_vector)
 
@@ -87,11 +107,8 @@ if __name__ == "__main__":
     else:
         prefix = ''
 
-    def filter_tokens(tokens, helper: PredictHelper):
-        return [tok for tok in tokens if 'vehicle' in helper.get_sample_annotation(*tok.split("_"))['category_name']]
-
-    train_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'train'), helper)
-    val_tokens = filter_tokens(get_prediction_challenge_split(prefix + 'val'), helper)
+    train_tokens = get_prediction_challenge_split(prefix + 'train')
+    val_tokens = get_prediction_challenge_split(prefix + 'val')
 
     static_layer_rasterizer = StaticLayerRasterizer(helper)
     agent_rasterizer = AgentBoxesWithFadedHistory(helper)
@@ -115,7 +132,7 @@ if __name__ == "__main__":
 
     json.dump(losses, open(loss_file_name, "w"))
 
-    optimizer = optim.SGD(model.parameters(), lr=0.001)
+    optimizer = optim.SGD(model.parameters(), lr=0.001, )
 
     for epoch_number in range(args.num_epochs):
 
