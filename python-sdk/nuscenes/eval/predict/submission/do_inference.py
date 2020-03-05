@@ -9,6 +9,7 @@ from typing import List
 from nuscenes import NuScenes
 from nuscenes.eval.common.config import config_factory
 from nuscenes.eval.predict.config import PredictionConfig
+from nuscenes.eval.predict.config import load_prediction_config
 from nuscenes.eval.predict.data_classes import Prediction
 from nuscenes.eval.predict.splits import get_prediction_challenge_split
 from nuscenes.predict import PredictHelper
@@ -63,7 +64,7 @@ def main(version: str, data_root: str, split_name: str, model_weights: str,
     nusc = NuScenes(version=version, dataroot=data_root)
     helper = PredictHelper(nusc)
     dataset = get_prediction_challenge_split(split_name)
-    config = config_factory(config_name)
+    config = load_prediction_config(helper, config_name)
 
     predictions = do_inference_for_submission(helper, config, model_weights, dataset)
     predictions = [prediction.serialize() for prediction in predictions]
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_weights', help='Path to model weights')
     parser.add_argument('--output_dir', help='Directory to store output file.')
     parser.add_argument('--submission_name', help='Name of the submission to use for the results file.')
-    parser.add_argument('--config_name', help='Name of the config file to use', default='predict_2020_icra')
+    parser.add_argument('--config_name', help='Name of the config file to use', default='predict_2020_icra.json')
 
     args = parser.parse_args()
     main(args.version, args.data_root, args.split_name, args.model_weights,
