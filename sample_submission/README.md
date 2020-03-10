@@ -12,7 +12,11 @@ docker/ directory contains docker image required to run NuScenes Prediction Chal
 ## Usage
 - pull docker image
 ```
-docker pull nuscenes/dev-challenge:latest
+# for cuda 10.1
+docker pull nuscenes/dev-challenge:10.1
+
+for cuda 9.2
+docker pull nuscenes/dev-challenge:9.2
 ```
 
 - create directory for output data
@@ -30,7 +34,7 @@ docker run [ --gpus all ] -ti --rm \
    -v <PATH TO nuScenes-devkit ROOT DIR>/python-sdk:/nuscenes-dev/python-sdk \
    -v <PATH TO YOUR SOURCES>:/nuscenes-dev/predict \
    -v ~/Documents:/nuscenes-dev/Documents \
-   nuscenes/dev-challenge:latest
+   nuscenes/dev-challenge:<CUDA VERSION>
 ```
 
 NOTE: The docker image uses 1000:1000 uid:gid
