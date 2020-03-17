@@ -132,6 +132,7 @@ class TrackingEval:
             metric_data_list.set(curr_class_name, curr_md)
 
         for class_name in self.cfg.class_names:
+            print(class_name)
             accumulate_class(class_name)
 
         # -----------------------------------
